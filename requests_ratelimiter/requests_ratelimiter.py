@@ -1,6 +1,6 @@
 from inspect import signature
 from logging import getLogger
-from typing import TYPE_CHECKING, Callable, Dict, Type, Union
+from typing import TYPE_CHECKING, Callable, Dict, Mapping, Optional, Tuple, Type, Union
 from urllib.parse import urlparse
 from uuid import uuid4
 
@@ -13,10 +13,16 @@ if TYPE_CHECKING:
     MIXIN_BASE = Session
 else:
     MIXIN_BASE = object
+
+
+StrOrBytes = Union[bytes, str]
+CertType = Union[StrOrBytes, Tuple[StrOrBytes, StrOrBytes]]
+TimeoutType = Union[float, Tuple[float, Optional[float]]]
+
 logger = getLogger(__name__)
 
 
-class LimiterMixin(MIXIN_BASE):
+class BaseLimiterMixin:
     """Mixin class that adds rate-limiting behavior to requests.
 
     The following parameters also apply to :py:class:`.LimiterSession` and
@@ -82,17 +88,16 @@ class LimiterMixin(MIXIN_BASE):
 
         # If the superclass is an adapter or custom Session, pass along any valid keyword arguments
         session_kwargs = get_valid_kwargs(super().__init__, kwargs)
-        super().__init__(**session_kwargs)  # type: ignore  # Base Session doesn't take any kwargs
+        super().__init__(**session_kwargs)
 
-    # Conveniently, both Session.send() and HTTPAdapter.send() have a mostly consistent signature
-    def send(self, request: PreparedRequest, **kwargs) -> Response:
+    def send_with_ratelimit(self, request: PreparedRequest, **kwargs) -> Response:
         """Send a request with rate-limiting"""
         with self.limiter.ratelimit(
             self._bucket_name(request),
             delay=True,
             max_delay=self.max_delay,
         ):
-            response = super().send(request, **kwargs)
+            response = super().send(request, **kwargs)  # type: ignore  # super may be Session or Adapter
             if response.status_code == 429:
                 self._fill_bucket(request)
             return response
@@ -113,17 +118,36 @@ class LimiterMixin(MIXIN_BASE):
                 break
 
 
+class LimiterMixin(BaseLimiterMixin, MIXIN_BASE):
+    def send(self, request: PreparedRequest, **kwargs) -> Response:
+        return self.send_with_ratelimit(request, **kwargs)
+
+
 class LimiterSession(LimiterMixin, Session):
     """`Session <https://docs.python-requests.org/en/master/user/advanced/#session-objects>`_
     that adds rate-limiting behavior to requests.
     """
 
 
-class LimiterAdapter(LimiterMixin, HTTPAdapter):  # type: ignore  # send signature accepts **kwargs
+class LimiterAdapter(BaseLimiterMixin, HTTPAdapter):
     """`Transport adapter
     <https://docs.python-requests.org/en/master/user/advanced/#transport-adapters>`_
     that adds rate-limiting behavior to requests.
     """
+
+    # This just exists to provide correct type hints and a consistent signature
+    def send(
+        self,
+        request: PreparedRequest,
+        stream: bool = False,
+        timeout: TimeoutType = None,
+        verify: Union[bool, str] = True,
+        cert: CertType = None,
+        proxies: Mapping[str, str] = None,
+    ) -> Response:
+        return self.send_with_ratelimit(
+            request, stream=stream, timeout=timeout, verify=verify, cert=cert, proxies=proxies
+        )
 
 
 def get_valid_kwargs(func: Callable, kwargs: Dict) -> Dict:
