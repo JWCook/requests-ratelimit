@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "requests-ratelimiter"
-version = "0.7.1"
+version = "0.8.0"
 description = "Rate-limiting for the requests library"
 authors = ["Jordan Cook"]
 license = "MIT"
@@ -20,8 +20,8 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python          = "^3.7"
-pyrate-limiter  = "<3.0"
+python          = "^3.8"
+pyrate-limiter  = ">=3.0"
 requests        = ">=2.20"
 
 # Documentation dependencies needed for Readthedocs builds
@@ -36,18 +36,14 @@ docs = ["furo", "myst-parser", "sphinx", "sphinx-autodoc-typehints",
         "sphinx-copybutton", "sphinxcontrib-apidoc"]
 
 [tool.poetry.dev-dependencies]
-coverage        = "^7.2"
-pre-commit      = "^2.21"
-pytest          = "^7.2"
+coverage        = "^7.6"
+execnet         = ">=2.0"
+pre-commit      = "^3.2"
+pytest          = "^8.3"
 pytest-cov      = ">=4.0"
 pytest-xdist    = ">=3.1"
 requests-mock   = ">=1.11"
-requests-cache  = ">=1.1"
-# Workaround for execnet 2.1 not working on python 3.7 and missing package metadata
-execnet = [
-    {python = "3.7", version = ">=2.0,<2.1"},
-    {python = ">=3.8", version = ">=2.0"}
-]
+requests-cache  = ">=1.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
